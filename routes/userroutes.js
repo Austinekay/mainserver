@@ -1,28 +1,15 @@
-const express = require('express')
-
+const express = require('express');
+const { getAllUsers, getCurrentUser, getUserById, createUser, updateUser, deleteUser } = require('../controllers/userController');
+const { auth } = require('../middlewares/auth.JS');
+const { requireAdmin } = require('../middlewares/adminMiddleware');
 
 const userRouter = express.Router();
 
-userRouter.get('/',(req,res)=>{
-    res.send("all users");
-});
-
-// Current user route
-userRouter.get('/me',(req,res)=>{
-    res.send("current user");
-});
-
-// User specific routes
-userRouter.get('/:id',(req,res)=>{
-    res.send(`user with id ${req.params.id}`);
-});
-
-userRouter.put('/:id',(req,res)=>{
-    res.send(`update user with id ${req.params.id}`);
-});
-
-userRouter.delete('/:id',(req,res)=>{
-    res.send(`delete user with id ${req.params.id}`);
-});
+userRouter.get('/', auth, requireAdmin, getAllUsers);
+userRouter.post('/', auth, requireAdmin, createUser);
+userRouter.get('/me', auth, getCurrentUser);
+userRouter.get('/:id', auth, getUserById);
+userRouter.put('/:id', auth, updateUser);
+userRouter.delete('/:id', auth, requireAdmin, deleteUser);
 
 module.exports = { userRouter };
