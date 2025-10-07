@@ -1,20 +1,13 @@
 const express = require('express');
+const { register, login, verify, googleAuth, googleCallback } = require('../controllers/authController');
+const { auth } = require('../middlewares/auth.JS');
 
 const authRouter = express.Router();
 
-// POST /auth/register
-authRouter.post('/register', (req, res) => {
-    res.send('Register a new user');
-});
-
-// POST /auth/login
-authRouter.post('/login', (req, res) => {
-    res.send('Log in user');
-});
-
-// GET /auth/verify
-authRouter.get('/verify', (req, res) => {
-    res.send('Verify user token/session');
-});
+authRouter.post('/register', register);
+authRouter.post('/login', login);
+authRouter.get('/verify', auth, verify);
+authRouter.get('/google', googleAuth);
+authRouter.get('/google/callback', googleCallback);
 
 module.exports = { authRouter };

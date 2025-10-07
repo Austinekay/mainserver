@@ -5,7 +5,13 @@ const shopSchema = new mongoose.Schema({
   owner: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: function() {
+      return !this.ownerId;
+    }
+  },
+  ownerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   },
   name: {
     type: String,
@@ -19,12 +25,19 @@ const shopSchema = new mongoose.Schema({
     type: {
       type: String,
       enum: ['Point'],
-      default: 'Point'
+      required: true
     },
     coordinates: {
       type: [Number],
       required: true,
-      default: [0, 0] // Default coordinates for now
+      validate: {
+        validator: function(coords) {
+          return coords.length === 2 && 
+                 coords[0] >= -180 && coords[0] <= 180 && // longitude
+                 coords[1] >= -90 && coords[1] <= 90;     // latitude
+        },
+        message: 'Invalid coordinates. Longitude must be between -180 and 180, latitude between -90 and 90.'
+      }
     }
   },
   address: {
@@ -35,6 +48,17 @@ const shopSchema = new mongoose.Schema({
     type: String,
     required: true
   }],
+  images: [{
+    type: String
+  }],
+  approved: {
+    type: Boolean,
+    default: false
+  },
+  contact: {
+    type: String,
+    trim: true
+  },
   openingHours: {
     type: Map,
     of: {
@@ -62,5 +86,3 @@ const shopSchema = new mongoose.Schema({
 shopSchema.index({ location: '2dsphere' });
 
 module.exports = mongoose.model('Shop', shopSchema);
-const jwt = require('jsonwebtoken');
-const rateLimit = require('express-rate-limit');
