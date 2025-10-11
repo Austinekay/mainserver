@@ -3,6 +3,9 @@ const { auth } = require('../middlewares/auth.JS');
 const { requireAdmin } = require('../middlewares/adminMiddleware');
 const User = require('../models/user');
 const Shop = require('../models/shop');
+const Analytics = require('../models/analytics');
+const { getSettings, updateSettings } = require('../controllers/settingsController');
+
 
 const adminRouter = express.Router();
 
@@ -110,29 +113,41 @@ adminRouter.delete('/shops/:id', auth, requireAdmin, async (req, res) => {
 });
 
 // Settings management
-adminRouter.get('/settings', auth, requireAdmin, async (req, res) => {
-  try {
-    // Return default settings - in a real app, these would be stored in database
-    const settings = {
-      emailNotifications: true,
-      pushNotifications: false,
-      autoApproveShops: false,
-      maintenanceMode: false,
-      maxShopsPerUser: 5,
-      sessionTimeout: 30,
-      backupFrequency: 'daily',
-    };
-    res.json({ settings });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
+adminRouter.get('/settings', auth, requireAdmin, getSettings);
+adminRouter.put('/settings', auth, requireAdmin, updateSettings);
 
-adminRouter.put('/settings', auth, requireAdmin, async (req, res) => {
+
+
+// Get admin stats
+adminRouter.get('/stats', auth, requireAdmin, async (req, res) => {
   try {
-    // In a real app, save settings to database
-    const settings = req.body;
-    res.json({ message: 'Settings updated successfully', settings });
+    const totalUsers = await User.countDocuments();
+    const totalShops = await Shop.countDocuments();
+    const activeShops = await Shop.countDocuments({ approved: true });
+    const pendingShops = await Shop.countDocuments({ approved: false });
+    
+    // Get categories count
+    const categoryStats = await Shop.aggregate([
+      { $unwind: '$categories' },
+      { $group: { _id: '$categories', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+    const totalCategories = categoryStats.length;
+    
+    // Mock data for reports (you can implement actual report model later)
+    const pendingReports = 8;
+    const resolvedReports = 45;
+    
+    res.json({
+      totalUsers,
+      totalShops,
+      activeShops,
+      pendingShops,
+      totalCategories,
+      pendingReports,
+      resolvedReports,
+      categoryStats: categoryStats.slice(0, 5) // Top 5 categories
+    });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -143,25 +158,82 @@ adminRouter.get('/analytics', auth, requireAdmin, async (req, res) => {
   try {
     const totalUsers = await User.countDocuments();
     const totalShops = await Shop.countDocuments();
+    const activeUsers = await User.countDocuments({ suspended: { $ne: true } });
+    
+    // Get category statistics
+    const categoryStats = await Shop.aggregate([
+      { $unwind: '$categories' },
+      { $group: { _id: '$categories', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 5 }
+    ]);
+    
+    // Calculate percentages for categories
+    const topCategories = categoryStats.map(cat => ({
+      name: cat._id,
+      count: cat.count,
+      percentage: totalShops > 0 ? Math.round((cat.count / totalShops) * 100 * 10) / 10 : 0
+    }));
+    
+    // Get location statistics (group by first word of address as city)
+    const locationStats = await Shop.aggregate([
+      {
+        $addFields: {
+          city: {
+            $arrayElemAt: [
+              { $split: ['$address', ','] },
+              0
+            ]
+          }
+        }
+      },
+      {
+        $group: {
+          _id: '$city',
+          shopCount: { $sum: 1 }
+        }
+      },
+      { $sort: { shopCount: -1 } },
+      { $limit: 5 }
+    ]);
+    
+    const popularLocations = locationStats.map(loc => ({
+      city: loc._id.trim(),
+      shopCount: loc.shopCount,
+      viewCount: Math.floor(loc.shopCount * 250) // Mock view count based on shop count
+    }));
     
     res.json({
       platformStats: {
         totalUsers,
-        activeUsers: Math.floor(totalUsers * 0.7),
+        activeUsers,
         totalShops,
-        totalViews: 45230,
-        totalClicks: 12450
+        totalViews: await Analytics.countDocuments({ type: 'view' }),
+        totalClicks: await Analytics.countDocuments({ type: 'click' })
       },
-      topCategories: [
-        { name: 'Restaurants', count: 45, percentage: 28.8 },
-        { name: 'Retail', count: 38, percentage: 24.4 }
-      ],
-      popularLocations: [
-        { city: 'New York', shopCount: 45, viewCount: 12500 }
-      ]
+      topCategories,
+      popularLocations
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Track analytics
+adminRouter.post('/track', async (req, res) => {
+  try {
+    const { shopId, type } = req.body;
+    const analytics = new Analytics({
+      shopId,
+      type,
+      userId: req.user?.userId,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent')
+    });
+    await analytics.save();
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ message: 'Tracking failed', error: error.message });
   }
 });
 

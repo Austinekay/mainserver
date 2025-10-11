@@ -2,8 +2,6 @@ const express = require('express');
 const Shop = require('../models/shop');
 const { 
   getDashboardStats, 
-  getNotifications, 
-  markNotificationRead, 
   getShopAnalytics 
 } = require('../controllers/shopOwnerController');
 const { auth } = require('../middlewares/auth.JS');
@@ -12,8 +10,7 @@ const shopOwnerRouter = express.Router();
 
 // Dashboard routes
 shopOwnerRouter.get('/dashboard/stats', auth, getDashboardStats);
-shopOwnerRouter.get('/notifications', auth, getNotifications);
-shopOwnerRouter.put('/notifications/:id/read', auth, markNotificationRead);
+
 
 // Shop management
 shopOwnerRouter.get('/my-shops', auth, async (req, res) => {

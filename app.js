@@ -5,6 +5,8 @@ const mongoose = require('mongoose');
 const passport = require('passport');
 const session = require('express-session');
 
+const { initializeSettings } = require('./controllers/settingsController');
+
 //routes
 const {userRouter}= require('./routes/userroutes');
 const {shopRouter}=require('./routes/shopRoutes');
@@ -12,6 +14,8 @@ const {authRouter}=require('./routes/authroutes');
 const {reviewRouter}=require('./routes/reviewRoutes');
 const {shopOwnerRouter}=require('./routes/shopOwnerRoutes');
 const {adminRouter}=require('./routes/adminRoutes');
+const {recommendationRouter}=require('./routes/recommendationRoutes');
+
 
 const app = express();
 app.use(cors({
@@ -30,7 +34,12 @@ app.use(passport.session());
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('Connected to MongoDB'))
+  .then(async () => {
+    console.log('Connected to MongoDB');
+    // Initialize default settings
+    await initializeSettings();
+    console.log('Settings initialized');
+  })
   .catch(err => console.error('MongoDB connection error:', err));
 
 app.get('/',(req,res)=>{
@@ -52,6 +61,8 @@ app.use('/api/v1/shops', shopRouter);
 app.use('/api/v1/reviews', reviewRouter);
 app.use('/api/v1/shop-owner', shopOwnerRouter);
 app.use('/api/v1/admin', adminRouter);
+app.use('/api', recommendationRouter);
+
 
 // Error handling
 app.use((err, req, res, next) => {
@@ -59,6 +70,8 @@ app.use((err, req, res, next) => {
   console.error('Stack:', err.stack);
   res.status(500).json({ message: 'Server error', error: err.message });
 });
+
+
 
 app.listen(8000,()=>{
     console.log('server running on port 8000')
