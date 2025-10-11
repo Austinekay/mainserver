@@ -1,5 +1,6 @@
 const Shop = require('../models/shop');
 const User = require('../models/user');
+const Analytics = require('../models/analytics');
 const NodeGeocoder = require('node-geocoder');
 
 
@@ -29,6 +30,17 @@ const createShop = async (req, res) => {
       return res.status(400).json({ message: 'Invalid coordinates provided' });
     }
     
+    // Ensure openingHours has proper structure with isClosed property
+    const defaultHours = {
+      'monday': { open: '09:00', close: '17:00', isClosed: false },
+      'tuesday': { open: '09:00', close: '17:00', isClosed: false },
+      'wednesday': { open: '09:00', close: '17:00', isClosed: false },
+      'thursday': { open: '09:00', close: '17:00', isClosed: false },
+      'friday': { open: '09:00', close: '17:00', isClosed: false },
+      'saturday': { open: '10:00', close: '16:00', isClosed: false },
+      'sunday': { open: '10:00', close: '16:00', isClosed: false }
+    };
+
     const shop = new Shop({
       owner: ownerId || req.user.userId,
       ownerId: ownerId || req.user.userId,
@@ -39,7 +51,7 @@ const createShop = async (req, res) => {
       categories: categories || ['General'],
       images: images || [],
       location,
-      openingHours: openingHours || undefined
+      openingHours: openingHours || defaultHours
     });
 
     await shop.save();
@@ -109,6 +121,21 @@ const getShopById = async (req, res) => {
       console.log('getShopById - shop not found for ID:', req.params.id);
       return res.status(404).json({ message: 'Shop not found' });
     }
+    
+    // Track view analytics
+    try {
+      const analytics = new Analytics({
+        shopId: shop._id,
+        type: 'view',
+        userId: req.user?.userId || null,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      });
+      await analytics.save();
+    } catch (analyticsError) {
+      console.error('Error saving analytics:', analyticsError);
+    }
+    
     console.log('getShopById - found shop:', shop.name);
     console.log('getShopById - shop images:', shop.images);
     res.json({ shop });
@@ -222,6 +249,79 @@ const searchShopsByLocation = async (req, res) => {
   }
 };
 
+const trackShopClick = async (req, res) => {
+  try {
+    const { shopId } = req.params;
+    console.log('trackShopClick called for shopId:', shopId);
+    
+    const shop = await Shop.findById(shopId);
+    if (!shop) {
+      console.log('Shop not found for ID:', shopId);
+      return res.status(404).json({ message: 'Shop not found' });
+    }
+    
+    const analyticsData = {
+      shopId: shop._id,
+      type: 'click',
+      userId: req.user?.userId || null,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent')
+    };
+    console.log('Creating analytics record:', analyticsData);
+    
+    const analytics = new Analytics(analyticsData);
+    await analytics.save();
+    console.log('Click analytics saved successfully');
+    
+    res.json({ message: 'Click tracked successfully' });
+  } catch (error) {
+    console.error('trackShopClick error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+const getShopStatus = async (req, res) => {
+  try {
+    const { shopId } = req.params;
+    const shop = await Shop.findById(shopId);
+    
+    if (!shop) {
+      return res.status(404).json({ message: 'Shop not found' });
+    }
+
+    const now = new Date();
+    const currentDay = now.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+    const currentTime = now.toTimeString().slice(0, 5);
+
+    const todayHours = shop.openingHours.get(currentDay);
+    
+    let isOpen = false;
+    let message = 'Hours not available';
+
+    if (todayHours) {
+      if (todayHours.isClosed) {
+        message = 'Closed today';
+      } else {
+        const openTime = todayHours.open;
+        const closeTime = todayHours.close;
+
+        if (currentTime >= openTime && currentTime <= closeTime) {
+          isOpen = true;
+          message = `Open until ${closeTime}`;
+        } else if (currentTime < openTime) {
+          message = `Opens at ${openTime}`;
+        } else {
+          message = 'Closed - Opens tomorrow';
+        }
+      }
+    }
+
+    res.json({ isOpen, message, currentTime, currentDay });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   createShop,
   getShops,
@@ -229,5 +329,7 @@ module.exports = {
   getShopsByOwner,
   updateShop,
   deleteShop,
-  searchShopsByLocation
+  searchShopsByLocation,
+  trackShopClick,
+  getShopStatus
 };
