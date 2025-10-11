@@ -63,17 +63,18 @@ const shopSchema = new mongoose.Schema({
     type: Map,
     of: {
       open: String,
-      close: String
+      close: String,
+      isClosed: { type: Boolean, default: false }
     },
     required: true,
     default: {
-      'monday': { open: '09:00', close: '17:00' },
-      'tuesday': { open: '09:00', close: '17:00' },
-      'wednesday': { open: '09:00', close: '17:00' },
-      'thursday': { open: '09:00', close: '17:00' },
-      'friday': { open: '09:00', close: '17:00' },
-      'saturday': { open: '10:00', close: '16:00' },
-      'sunday': { open: '10:00', close: '16:00' }
+      'monday': { open: '09:00', close: '17:00', isClosed: false },
+      'tuesday': { open: '09:00', close: '17:00', isClosed: false },
+      'wednesday': { open: '09:00', close: '17:00', isClosed: false },
+      'thursday': { open: '09:00', close: '17:00', isClosed: false },
+      'friday': { open: '09:00', close: '17:00', isClosed: false },
+      'saturday': { open: '10:00', close: '16:00', isClosed: false },
+      'sunday': { open: '10:00', close: '16:00', isClosed: false }
     }
   },
   createdAt: {
