@@ -1,7 +1,7 @@
 const Shop = require('../models/shop');
 const Review = require('../models/review');
 const Analytics = require('../models/analytics');
-const Notification = require('../models/notification');
+
 
 const getDashboardStats = async (req, res) => {
   try {
@@ -41,27 +41,7 @@ const getDashboardStats = async (req, res) => {
   }
 };
 
-const getNotifications = async (req, res) => {
-  try {
-    const notifications = await Notification.find({ recipient: req.user.userId })
-      .populate('relatedShop', 'name')
-      .sort({ createdAt: -1 })
-      .limit(20);
 
-    res.json({ notifications });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-};
-
-const markNotificationRead = async (req, res) => {
-  try {
-    await Notification.findByIdAndUpdate(req.params.id, { read: true });
-    res.json({ message: 'Notification marked as read' });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-};
 
 const getShopAnalytics = async (req, res) => {
   try {
@@ -103,7 +83,5 @@ const getShopAnalytics = async (req, res) => {
 
 module.exports = {
   getDashboardStats,
-  getNotifications,
-  markNotificationRead,
   getShopAnalytics,
 };

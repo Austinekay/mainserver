@@ -3,6 +3,7 @@ const User = require('../models/user');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 
+
 const generateToken = (userId, role) => {
   return jwt.sign(
     { userId, role },
@@ -32,6 +33,8 @@ const register = async (req, res) => {
     const user = new User({ name, email, password, role });
     await user.save();
     console.log('User created successfully:', user._id);
+
+
 
     const token = generateToken(user._id, user.role);
 

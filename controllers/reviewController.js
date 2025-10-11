@@ -1,5 +1,7 @@
+const mongoose = require('mongoose');
 const Review = require('../models/review');
 const Shop = require('../models/shop');
+
 
 const createReview = async (req, res) => {
   try {
@@ -31,6 +33,8 @@ const createReview = async (req, res) => {
 
     await review.save();
     await review.populate('user', 'name');
+
+
 
     res.status(201).json({
       message: 'Review created successfully',
@@ -153,6 +157,9 @@ const replyToReview = async (req, res) => {
 
     await review.save();
     await review.populate('reply.author', 'name');
+    await review.populate('user', 'name');
+
+
 
     res.json({
       message: 'Reply added successfully',

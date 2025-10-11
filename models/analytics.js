@@ -1,32 +1,26 @@
 const mongoose = require('mongoose');
 
 const analyticsSchema = new mongoose.Schema({
-  shop: {
+  shopId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Shop',
-    required: true,
+    required: true
   },
-  date: {
+  type: {
+    type: String,
+    enum: ['view', 'click'],
+    required: true
+  },
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  ipAddress: String,
+  userAgent: String,
+  timestamp: {
     type: Date,
-    default: Date.now,
-  },
-  visits: {
-    type: Number,
-    default: 0,
-  },
-  clicks: {
-    type: Number,
-    default: 0,
-  },
-  views: {
-    type: Number,
-    default: 0,
-  },
-}, {
-  timestamps: true,
+    default: Date.now
+  }
 });
-
-// Index for efficient queries
-analyticsSchema.index({ shop: 1, date: -1 });
 
 module.exports = mongoose.model('Analytics', analyticsSchema);

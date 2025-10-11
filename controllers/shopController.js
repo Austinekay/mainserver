@@ -1,5 +1,7 @@
 const Shop = require('../models/shop');
+const User = require('../models/user');
 const NodeGeocoder = require('node-geocoder');
+
 
 const geocoder = NodeGeocoder({
   provider: 'openstreetmap'
@@ -43,6 +45,8 @@ const createShop = async (req, res) => {
     await shop.save();
     await shop.populate('owner', 'name email');
 
+
+
     res.status(201).json({
       message: 'Shop created successfully',
       shop
@@ -55,9 +59,19 @@ const createShop = async (req, res) => {
 const getShops = async (req, res) => {
   try {
     console.log('getShops called with query:', req.query);
-    const { lat, lng, radius = 5000, category } = req.query;
+    const { lat, lng, radius = 5000, category, search } = req.query;
     
-    let query = {};
+    let query = { approved: true };
+    
+    // Add search filter if provided
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { address: { $regex: search, $options: 'i' } },
+        { categories: { $in: [new RegExp(search, 'i')] } }
+      ];
+    }
     
     // Add geolocation filter if coordinates provided
     if (lat && lng) {
@@ -74,10 +88,10 @@ const getShops = async (req, res) => {
     
     // Add category filter if provided
     if (category) {
-      query.categories = { $in: [category] };
+      query.categories = { $in: [new RegExp(category, 'i')] };
     }
     
-    console.log('Shop query:', query);
+    console.log('Shop query:', JSON.stringify(query, null, 2));
     const shops = await Shop.find(query).populate('owner', 'name email');
     console.log('Found shops:', shops.length);
     res.json({ shops });
@@ -192,7 +206,7 @@ const searchShopsByLocation = async (req, res) => {
     };
     
     if (category) {
-      query.categories = { $in: [category] };
+      query.categories = { $in: [new RegExp(category, 'i')] };
     }
     
     console.log('Location search query:', JSON.stringify(query, null, 2));
