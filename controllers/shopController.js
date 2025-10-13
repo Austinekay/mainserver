@@ -106,7 +106,17 @@ const getShops = async (req, res) => {
     console.log('Shop query:', JSON.stringify(query, null, 2));
     const shops = await Shop.find(query).populate('owner', 'name email');
     console.log('Found shops:', shops.length);
-    res.json({ shops });
+    
+    // Convert shops to objects and ensure openingHours is properly formatted
+    const formattedShops = shops.map(shop => {
+      const shopObject = shop.toObject();
+      if (shopObject.openingHours && shopObject.openingHours instanceof Map) {
+        shopObject.openingHours = Object.fromEntries(shopObject.openingHours);
+      }
+      return shopObject;
+    });
+    
+    res.json({ shops: formattedShops });
   } catch (error) {
     console.error('getShops error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -136,9 +146,21 @@ const getShopById = async (req, res) => {
       console.error('Error saving analytics:', analyticsError);
     }
     
+    // Convert shop to object and ensure openingHours is properly formatted
+    const shopObject = shop.toObject();
+    console.log('getShopById - original openingHours:', shopObject.openingHours);
+    
+    // Ensure openingHours is a proper object (convert from Map if needed)
+    if (shopObject.openingHours && typeof shopObject.openingHours === 'object') {
+      if (shopObject.openingHours instanceof Map) {
+        shopObject.openingHours = Object.fromEntries(shopObject.openingHours);
+      }
+    }
+    
+    console.log('getShopById - processed openingHours:', shopObject.openingHours);
     console.log('getShopById - found shop:', shop.name);
     console.log('getShopById - shop images:', shop.images);
-    res.json({ shop });
+    res.json({ shop: shopObject });
   } catch (error) {
     console.error('getShopById - error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -168,9 +190,14 @@ const updateShop = async (req, res) => {
 
     const { name, description, address, categories, coordinates, openingHours, images, contact } = req.body;
     
-    const updateData = { name, description, address, categories, openingHours, images, contact };
+    console.log('updateShop - received openingHours:', openingHours);
+    
+    const updateData = { name, description, address, categories, images, contact };
     if (coordinates) {
       updateData.location = { type: 'Point', coordinates };
+    }
+    if (openingHours) {
+      updateData.openingHours = openingHours;
     }
 
     const updatedShop = await Shop.findByIdAndUpdate(
@@ -178,6 +205,8 @@ const updateShop = async (req, res) => {
       updateData,
       { new: true }
     ).populate('owner', 'name email');
+
+    console.log('updateShop - updated shop openingHours:', updatedShop.openingHours);
 
     res.json({
       message: 'Shop updated successfully',
@@ -242,7 +271,17 @@ const searchShopsByLocation = async (req, res) => {
     shops.forEach(shop => {
       console.log(`Shop: ${shop.name}, Coordinates: [${shop.location.coordinates}]`);
     });
-    res.json({ shops, count: shops.length });
+    
+    // Convert shops to objects and ensure openingHours is properly formatted
+    const formattedShops = shops.map(shop => {
+      const shopObject = shop.toObject();
+      if (shopObject.openingHours && shopObject.openingHours instanceof Map) {
+        shopObject.openingHours = Object.fromEntries(shopObject.openingHours);
+      }
+      return shopObject;
+    });
+    
+    res.json({ shops: formattedShops, count: formattedShops.length });
   } catch (error) {
     console.error('searchShopsByLocation error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });

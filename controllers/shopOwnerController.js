@@ -146,8 +146,14 @@ const getMyShops = async (req, res) => {
         const totalClicks = await Analytics.countDocuments({ shopId: shop._id, type: 'click' });
         const totalReviews = await Review.countDocuments({ shop: shop._id });
         
+        const shopObject = shop.toObject();
+        // Ensure openingHours is properly formatted
+        if (shopObject.openingHours && shopObject.openingHours instanceof Map) {
+          shopObject.openingHours = Object.fromEntries(shopObject.openingHours);
+        }
+        
         return {
-          ...shop.toObject(),
+          ...shopObject,
           analytics: {
             totalViews,
             totalClicks,
