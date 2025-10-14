@@ -33,19 +33,42 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // Connect to MongoDB
+if (!process.env.MONGODB_URI) {
+  console.error('MONGODB_URI environment variable is not set');
+  process.exit(1);
+}
+
 mongoose.connect(process.env.MONGODB_URI)
   .then(async () => {
     console.log('Connected to MongoDB');
-    // Initialize default settings
-    await initializeSettings();
-    console.log('Settings initialized');
+    try {
+      // Initialize default settings
+      await initializeSettings();
+      console.log('Settings initialized');
+    } catch (error) {
+      console.error('Error initializing settings:', error);
+    }
   })
-  .catch(err => console.error('MongoDB connection error:', err));
+  .catch(err => {
+    console.error('MongoDB connection error:', err);
+    process.exit(1);
+  });
 
 app.get('/',(req,res)=>{
-    res.send("hello world")
-    console.log("hello world")
-})
+    res.json({ 
+      message: "ShopPilot Backend API",
+      status: "running",
+      timestamp: new Date().toISOString()
+    });
+});
+
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'healthy',
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Add request logging
 app.use((req, res, next) => {
@@ -73,7 +96,19 @@ app.use((err, req, res, next) => {
 
 
 
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
 const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+    console.log('Environment:', process.env.NODE_ENV || 'development');
 });
