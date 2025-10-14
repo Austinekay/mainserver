@@ -19,9 +19,9 @@
   },
   "name": "mainserver",
   "version": "1.0.0",
-  "main": "app-full.js",
+  "main": "app.js",
   "scripts": {
-    "start": "node app-full.js",
+    "start": "node app.js",
     "dev": "nodemon app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
