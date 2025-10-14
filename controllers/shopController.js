@@ -2,6 +2,7 @@ const Shop = require('../models/shop');
 const User = require('../models/user');
 const Analytics = require('../models/analytics');
 const NodeGeocoder = require('node-geocoder');
+const { uploadToS3 } = require('../utils/uploadToS3');
 
 
 const geocoder = NodeGeocoder({
@@ -10,18 +11,56 @@ const geocoder = NodeGeocoder({
 
 const createShop = async (req, res) => {
   try {
-    const { name, description, address, categories, location, openingHours, ownerId, images, contact } = req.body;
+    console.log('=== CREATE SHOP START ===');
+    console.log('Headers:', req.headers);
+    console.log('Body:', req.body);
+    console.log('Files:', req.files);
     
-    console.log('createShop - received data:', { name, description, address, categories, images: images?.length || 0, contact });
-    console.log('createShop - images array:', images);
+    const contentType = req.get('Content-Type');
+    const isFormData = contentType && contentType.includes('multipart/form-data');
+    
+    let name, description, address, contact, categories, location, openingHours, ownerId;
+    
+    if (isFormData) {
+      // Handle FormData request (with potential file upload)
+      ({ name, description, address, contact } = req.body);
+      try {
+        categories = req.body.categories ? JSON.parse(req.body.categories) : ['General'];
+        location = req.body.location ? JSON.parse(req.body.location) : null;
+        openingHours = req.body.openingHours ? JSON.parse(req.body.openingHours) : null;
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError);
+        return res.status(400).json({ message: 'Invalid JSON in form data', error: parseError.message });
+      }
+      ownerId = req.body.ownerId;
+    } else {
+      // Handle JSON request (no file upload)
+      ({ name, description, address, contact, categories = ['General'], location, openingHours, ownerId } = req.body);
+    }
+    
+    console.log('Parsed data:', { name, description, address, categories, contact, location });
+    
+    let imageUrl = null;
+    if (req.files && req.files.image && req.files.image[0]) {
+      try {
+        console.log('Uploading image to S3...');
+        imageUrl = await uploadToS3(req.files.image[0]);
+        console.log('Image uploaded to S3:', imageUrl);
+      } catch (uploadError) {
+        console.error('S3 upload error:', uploadError);
+        return res.status(500).json({ message: 'Image upload failed', error: uploadError.message });
+      }
+    }
     
     // Validate required fields
     if (!name || !description || !address) {
+      console.log('Validation failed:', { name: !!name, description: !!description, address: !!address });
       return res.status(400).json({ message: 'Name, description, and address are required' });
     }
     
     // Validate location coordinates
     if (!location || !location.coordinates || location.coordinates.length !== 2) {
+      console.log('Location validation failed:', { location });
       return res.status(400).json({ message: 'Valid location coordinates are required' });
     }
     
@@ -48,8 +87,8 @@ const createShop = async (req, res) => {
       description,
       address,
       contact,
-      categories: categories || ['General'],
-      images: images || [],
+      categories,
+      imageUrl,
       location,
       openingHours: openingHours || defaultHours
     });
@@ -64,7 +103,11 @@ const createShop = async (req, res) => {
       shop
     });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error('=== CREATE SHOP ERROR ===');
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', error);
+    res.status(500).json({ message: 'Server error', error: error.message, stack: error.stack });
   }
 };
 
@@ -178,6 +221,35 @@ const getShopsByOwner = async (req, res) => {
 
 const updateShop = async (req, res) => {
   try {
+    console.log('=== UPDATE SHOP START ===');
+    console.log('Shop ID:', req.params.id);
+    console.log('Content-Type:', req.get('Content-Type'));
+    console.log('Body:', req.body);
+    console.log('Files:', req.files);
+    
+    const contentType = req.get('Content-Type');
+    const isFormData = contentType && contentType.includes('multipart/form-data');
+    
+    let name, description, address, contact, categories, location, openingHours;
+    
+    if (isFormData) {
+      // Handle FormData request (with potential file upload)
+      ({ name, description, address, contact } = req.body);
+      try {
+        categories = req.body.categories ? JSON.parse(req.body.categories) : undefined;
+        location = req.body.location ? JSON.parse(req.body.location) : undefined;
+        openingHours = req.body.openingHours ? JSON.parse(req.body.openingHours) : undefined;
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError);
+        return res.status(400).json({ message: 'Invalid JSON in form data', error: parseError.message });
+      }
+    } else {
+      // Handle JSON request (no file upload)
+      ({ name, description, address, contact, categories, location, openingHours } = req.body);
+    }
+    
+    console.log('Parsed data:', { name, description, address, categories, contact, location, openingHours });
+    
     const shop = await Shop.findById(req.params.id);
     if (!shop) {
       return res.status(404).json({ message: 'Shop not found' });
@@ -188,17 +260,28 @@ const updateShop = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to update this shop' });
     }
 
-    const { name, description, address, categories, coordinates, openingHours, images, contact } = req.body;
+    // Handle image upload if present
+    let imageUrl = shop.imageUrl; // Keep existing image by default
+    if (req.files && req.files.image && req.files.image[0]) {
+      try {
+        console.log('Uploading new image to S3...');
+        imageUrl = await uploadToS3(req.files.image[0]);
+        console.log('New image uploaded to S3:', imageUrl);
+      } catch (uploadError) {
+        console.error('S3 upload error:', uploadError);
+        return res.status(500).json({ message: 'Image upload failed', error: uploadError.message });
+      }
+    }
     
-    console.log('updateShop - received openingHours:', openingHours);
-    
-    const updateData = { name, description, address, categories, images, contact };
-    if (coordinates) {
-      updateData.location = { type: 'Point', coordinates };
+    const updateData = { name, description, address, categories, contact, imageUrl };
+    if (location && location.coordinates) {
+      updateData.location = location;
     }
     if (openingHours) {
       updateData.openingHours = openingHours;
     }
+
+    console.log('updateShop - updateData:', updateData);
 
     const updatedShop = await Shop.findByIdAndUpdate(
       req.params.id,
@@ -206,13 +289,16 @@ const updateShop = async (req, res) => {
       { new: true }
     ).populate('owner', 'name email');
 
-    console.log('updateShop - updated shop openingHours:', updatedShop.openingHours);
+    console.log('updateShop - success');
 
     res.json({
       message: 'Shop updated successfully',
       shop: updatedShop
     });
   } catch (error) {
+    console.error('=== UPDATE SHOP ERROR ===');
+    console.error('Error:', error.message);
+    console.error('Stack:', error.stack);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

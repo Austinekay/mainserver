@@ -51,6 +51,9 @@ const shopSchema = new mongoose.Schema({
   images: [{
     type: String
   }],
+  imageUrl: {
+    type: String
+  },
   approved: {
     type: Boolean,
     default: false
