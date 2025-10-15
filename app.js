@@ -33,12 +33,10 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // Connect to MongoDB
-if (!process.env.MONGODB_URI) {
-  console.error('MONGODB_URI environment variable is not set');
-  process.exit(1);
-}
-
-mongoose.connect(process.env.MONGODB_URI)
+if (process.env.MONGODB_URI) {
+  mongoose.connect(process.env.MONGODB_URI, {
+    serverSelectionTimeoutMS: 10000,
+  })
   .then(async () => {
     console.log('Connected to MongoDB');
     try {
@@ -50,9 +48,11 @@ mongoose.connect(process.env.MONGODB_URI)
     }
   })
   .catch(err => {
-    console.error('MongoDB connection error:', err);
-    process.exit(1);
+    console.error('MongoDB connection error:', err.message);
   });
+} else {
+  console.log('MONGODB_URI not provided');
+}
 
 app.get('/',(req,res)=>{
     res.json({ 
@@ -95,17 +95,6 @@ app.use((err, req, res, next) => {
 });
 
 
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
-});
 
 const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => {
