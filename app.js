@@ -19,11 +19,31 @@ const {recommendationRouter}=require('./routes/recommendationRoutes');
 
 const app = express();
 // Clean CLIENT_URL and setup CORS
-const clientUrl = (process.env.CLIENT_URL || 'http://localhost:3000').replace(/\/$/, '');
+const clientUrl = (process.env.CLIENT_URL || 'http://localhost:3000')
+  .replace(/\/$/, '')
+  .replace(/["']/g, '') // Remove any quotes
+  .trim(); // Remove whitespace
+
 console.log('CORS origin set to:', clientUrl);
 
 app.use(cors({
-  origin: clientUrl,
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      clientUrl,
+      'http://localhost:3000',
+      'http://localhost:3001'
+    ];
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -76,11 +96,28 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Add request logging
+// Add request logging and header validation
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.path}`);
   console.log('Query params:', req.query);
   console.log('Body:', req.body);
+  
+  // Override res.setHeader to catch invalid characters
+  const originalSetHeader = res.setHeader;
+  res.setHeader = function(name, value) {
+    try {
+      // Check for HTML entities in header values
+      if (typeof value === 'string' && value.includes('&quot;')) {
+        console.error('Invalid header detected:', name, value);
+        value = value.replace(/&quot;/g, '"');
+      }
+      return originalSetHeader.call(this, name, value);
+    } catch (error) {
+      console.error('Header error:', error.message, 'Name:', name, 'Value:', value);
+      throw error;
+    }
+  };
+  
   next();
 });
 
