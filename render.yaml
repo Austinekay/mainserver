@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: shoppilot-backend
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        value: jfgdghdfghgfhjgfdskjhkgshjgsrnjkbgkjrjrejhrejhjb
+      - key: MONGODB_URI
+        value: mongodb+srv://shop-pilot:admin123@cluster0.gwx3yjn.mongodb.net/shopdb?retryWrites=true&w=majority&appName=Cluster0
+      - key: CLIENT_URL
+        value: https://shoppilot-nu.vercel.app
+      - key: SESSION_SECRET
+        value: your_session_secret_here
+      - key: OPENROUTER_API_KEY
+        value: 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
